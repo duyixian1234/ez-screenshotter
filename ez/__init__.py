@@ -6,10 +6,12 @@ from typing import Literal, Optional, TypedDict
 
 from fastapi import Depends, FastAPI
 from fastapi.responses import StreamingResponse
+from PIL import Image, ImageDraw, ImageFont
 from playwright.async_api import Browser, async_playwright
 from pydantic import BaseModel, HttpUrl
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+
 
 class Browsers(TypedDict):
     chromium: Browser
@@ -30,28 +32,40 @@ class Task(BaseModel):
 
     async def execute(self, browsers: Browsers, devices: dict[str, dict]):
         logging.info("Executing task %s", self)
+        image = await self.screenshot(browsers, devices)
+        return self.add_watermark(image)
+
+    async def screenshot(self, browsers: Browsers, devices: dict[str, dict]):
         browser = browsers[self.browser]
-        page = await browser.new_page(
-            **(
-                devices.get(self.device, {})
-                | {
-                    k: v
-                    for k, v in dict(
-                        viewport=self.viewport,
-                        screen=self.screen,
-                        user_agent=self.user_agent,
-                        locale=self.locale,
-                        color_scheme=self.color_scheme,
-                        timezone_id=self.timezone_id,
-                    ).items()
-                    if v
-                }
-            )
-        )
+        kwargs = devices.get(self.device, {}) | {
+            k: v
+            for k, v in dict(
+                viewport=self.viewport,
+                screen=self.screen,
+                user_agent=self.user_agent,
+                locale=self.locale,
+                color_scheme=self.color_scheme,
+                timezone_id=self.timezone_id,
+            ).items()
+            if v
+        }
+
+        page = await browser.new_page(**kwargs)
         await page.goto(self.url)
         with NamedTemporaryFile(suffix=".png") as f:
             await page.screenshot(path=f.name)
             return Path(f.name).read_bytes()
+
+    def add_watermark(self, image: bytes) -> bytes:
+        watermark_image = Image.open(BytesIO(image))
+        _, y = watermark_image.size
+        draw = ImageDraw.Draw(watermark_image)
+        font = ImageFont.truetype("arial.ttf", size=50)
+        draw.text((10, y - 100), "Powered By EZ Screenshot", (200, 200, 200), font=font)
+        temp = BytesIO()
+        watermark_image.save(temp, format="PNG")
+        temp.seek(0)
+        return temp.read()
 
 
 class Context:
@@ -64,10 +78,10 @@ class Context:
         self.context = async_playwright()
         self.p = await self.context.__aenter__()
         self.browsers = {
-                "chromium": await self.p.chromium.launch(),
-                "firefox": await self.p.firefox.launch(),
-                "webkit": await self.p.webkit.launch(),
-            }
+            "chromium": await self.p.chromium.launch(),
+            "firefox": await self.p.firefox.launch(),
+            "webkit": await self.p.webkit.launch(),
+        }
         self.devices = self.p.devices
         logging.info("Initialized context")
 
