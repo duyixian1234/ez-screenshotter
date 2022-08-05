@@ -7,7 +7,7 @@ from typing import Literal, Optional, TypedDict
 from fastapi import Depends, FastAPI
 from fastapi.responses import StreamingResponse
 from PIL import Image, ImageDraw, ImageFont
-from playwright.async_api import Browser, async_playwright
+from playwright.async_api import Browser, ViewportSize, async_playwright
 from pydantic import BaseModel, HttpUrl
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -23,8 +23,8 @@ class Task(BaseModel):
     url: HttpUrl
     browser: Literal["chromium", "firefox", "webkit"] = "chromium"
     device: Optional[str]
-    viewport: Optional[tuple[int, int]]
-    screen: Optional[tuple[int, int]]
+    viewport: Optional[ViewportSize]
+    screen: Optional[ViewportSize]
     user_agent: Optional[str]
     locale: Optional[str]
     color_scheme: Optional[Literal["dark", "light", "no-preference"]]
