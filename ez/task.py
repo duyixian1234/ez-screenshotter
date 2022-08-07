@@ -6,7 +6,7 @@ from typing import Any, Literal, Optional
 
 from PIL import Image, ImageDraw, ImageFont
 from playwright.async_api import Playwright, ViewportSize
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, HttpUrl
 
 from ez.config import get_settings
 from ez.context import Browsers
@@ -17,11 +17,11 @@ class Task(BaseModel):
     color_scheme: Optional[Literal["dark", "light", "no-preference"]]
     device: str = ""
     locale: Optional[str] = None
-    screen: Optional[ViewportSize] = Field(default={"width": 1920, "height": 1080})
+    screen: Optional[ViewportSize]
     timezone_id: Optional[str]
     url: HttpUrl
     user_agent: Optional[str] = None
-    viewport: Optional[ViewportSize] = Field(default={"width": 1920, "height": 1080})
+    viewport: Optional[ViewportSize]
 
     async def execute(self, browsers: Browsers, playwright: Playwright) -> bytes:
         logging.info("Executing task %s", self)
