@@ -10,23 +10,24 @@ RUN DEBIAN_FRONTEND=noninteractive apt update && apt install fontconfig wget -y 
     && mkfontscale && mkfontdir && fc-cache -fv \
     && apt remove fontconfig wget -y
 
-FROM base AS build
+FROM base AS deps
+ADD ./requirements.txt /tmp/requirements.txt
+RUN set -xe && \
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && echo "Asia/Shanghai" > /etc/timezone && \
+    pip install --no-cache-dir -r /tmp/requirements.txt -q
 
-WORKDIR /app
-RUN pip install -U poetry==1.1.14 -q -i https://mirrors.cloud.tencent.com/pypi/simple
-COPY poetry.lock ./poetry.lock
-COPY pyproject.toml ./pyproject.toml
-RUN poetry install -q --no-dev --no-root
-
-RUN EBIAN_FRONTEND=noninteractive apt update && poetry run python -m playwright install-deps && rm -rf /var/lib/apt/lists/*
-RUN poetry run python -m playwright install
-
-
-
-FROM build
-
+FROM deps AS build
+RUN set -xe \
+    && sed -i 's#security.debian.org#mirrors.cloud.tencent.com#' /etc/apt/sources.list \
+    && DEBIAN_FRONTEND=noninteractive apt update \
+    && python -m playwright install-deps \
+    && rm -rf /var/lib/apt/lists/*
+RUN python -m playwright install
 WORKDIR /app
 COPY ez ./ez
 
+
+FROM build
+WORKDIR /app
 EXPOSE 8080
-CMD poetry run uvicorn ez.main:app --port 8080 --host 0.0.0.0 --workers 4
+CMD uvicorn ez.main:app --port 8080 --host 0.0.0.0 --workers 4
